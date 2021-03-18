@@ -64,11 +64,32 @@ init =
 
 type Msg
     = NoOp
+    | PlayerDrawsCard
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        PlayerDrawsCard ->
+            let
+                drawnCard =
+                    List.take 1 model.stackedCards
+
+                newStack =
+                    List.drop 1 model.stackedCards
+
+                newHand =
+                    model.playerCards ++ drawnCard
+            in
+            ( { model
+                | stackedCards = newStack
+                , playerCards = newHand
+              }
+            , Cmd.none
+            )
+
+        NoOp ->
+            ( model, Cmd.none )
 
 
 
@@ -111,9 +132,15 @@ gameDealerView model =
         ]
         [ el
             [ alignLeft
-            , Font.color <| rgb 1 1 0
+            , Font.color <| rgb 1 1 1
+            , width <| fill
             ]
-            (text "Dealer Hand")
+          <|
+            column
+                [ width <| fill ]
+                [ text "Remaining cards"
+                , text <| String.fromInt (List.length model.stackedCards)
+                ]
         , el [ alignRight ] <| text "Dealer Game Status"
         ]
 
@@ -147,16 +174,16 @@ gameActionsView model =
         ]
         [ row [ centerX, centerY ] [ text "Game Actions" ]
         , row []
-            [ actionButton "Draw"
-            , actionButton "Hit"
-            , actionButton "Stand"
-            , actionButton "Deal"
+            [ actionButton "Draw" PlayerDrawsCard
+            , actionButton "Hit" NoOp
+            , actionButton "Stand" NoOp
+            , actionButton "Deal" NoOp
             ]
         ]
 
 
-actionButton : String -> Element Msg
-actionButton label =
+actionButton : String -> Msg -> Element Msg
+actionButton label action =
     Input.button
         [ Background.color <| rgb255 238 238 238
         , Element.focused [ Background.color <| rgb255 238 0 238 ]
@@ -164,7 +191,7 @@ actionButton label =
         , width <| px 80
         , Border.rounded 10
         ]
-        { onPress = Nothing
+        { onPress = Just <| action
         , label = text label
         }
 
@@ -197,7 +224,7 @@ cardItem card =
                     rgb255 20 20 20
     in
     el
-        [ Font.size 200
+        [ Font.size 120
         , Font.center
         , Font.color <| suitColor
         , Font.alignRight
