@@ -14,12 +14,53 @@ import Html exposing (Html)
 
 
 type alias Model =
-    {}
+    { playerCards : List Card
+    , stackedCards : List Card
+    }
+
+
+type alias Card =
+    { suit : Suit
+    , rank : Rank
+    }
+
+
+type Suit
+    = Spade
+    | Heart
+    | Diamond
+    | Club
+
+
+type Rank
+    = Ace
+    | Two
+    | Three
+    | Four
+    | Five
+    | Six
+    | Seven
+    | Eight
+    | Nine
+    | Ten
+    | Jack
+    | Queen
+    | King
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( {}, Cmd.none )
+    ( { playerCards =
+            [ Card Spade Ace
+            , Card Heart Two
+            , Card Diamond Three
+            , Card Club Four
+            , Card Club King
+            ]
+      , stackedCards = []
+      }
+    , Cmd.none
+    )
 
 
 
@@ -89,9 +130,15 @@ gamePlayerView model =
         ]
         [ el
             [ alignLeft
-            , Font.color <| rgb 1 1 0
+            , Font.color <| rgb 1 1 1
+            , width <| fill
             ]
-            (text "Player Hand")
+          <|
+            column
+                [ width <| fill ]
+                [ text "Player Hand"
+                , cardsView model.playerCards
+                ]
         , el [ alignRight ] <| text "Player Game Status"
         ]
 
@@ -125,6 +172,110 @@ actionButton label =
         { onPress = Nothing
         , label = text label
         }
+
+
+
+---- CARD HELPERS ----
+
+
+cardsView : List Card -> Element msg
+cardsView cards =
+    row
+        [ Background.color <| rgb 1 1 1
+        ]
+    <|
+        List.map cardItem cards
+
+
+cardItem : Card -> Element msg
+cardItem card =
+    let
+        suitColor =
+            case card.suit of
+                Heart ->
+                    rgb255 205 0 0
+
+                Diamond ->
+                    rgb255 205 0 0
+
+                _ ->
+                    rgb255 20 20 20
+    in
+    el
+        [ Font.size 200
+        , Font.center
+        , Font.color <| suitColor
+        , Font.alignRight
+        ]
+        (text <| cardToString card)
+
+
+cardToString : Card -> String
+cardToString card =
+    -- Turn cards into Unicode symbols
+    -- https://en.wikipedia.org/wiki/Playing_cards_in_Unicode
+    let
+        baseCard =
+            0x0001F0A1
+
+        suitOffset =
+            case card.suit of
+                Heart ->
+                    0x00
+
+                Spade ->
+                    0x10
+
+                Diamond ->
+                    0x20
+
+                Club ->
+                    0x30
+
+        rankOffset =
+            case card.rank of
+                Ace ->
+                    0
+
+                Two ->
+                    1
+
+                Three ->
+                    2
+
+                Four ->
+                    3
+
+                Five ->
+                    4
+
+                Six ->
+                    5
+
+                Seven ->
+                    6
+
+                Eight ->
+                    7
+
+                Nine ->
+                    8
+
+                Ten ->
+                    9
+
+                Jack ->
+                    10
+
+                -- We don't want a Knight in our set
+                -- Knight -> 11
+                Queen ->
+                    12
+
+                King ->
+                    13
+    in
+    baseCard + suitOffset + rankOffset |> Char.fromCode |> String.fromChar
 
 
 
