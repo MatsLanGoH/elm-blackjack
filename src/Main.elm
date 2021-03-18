@@ -7,6 +7,7 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
+import List.Extra as LE
 
 
 
@@ -50,14 +51,8 @@ type Rank
 
 init : ( Model, Cmd Msg )
 init =
-    ( { playerCards =
-            [ Card Spade Ace
-            , Card Heart Two
-            , Card Diamond Three
-            , Card Club Four
-            , Card Club King
-            ]
-      , stackedCards = []
+    ( { playerCards = []
+      , stackedCards = createStack
       }
     , Cmd.none
     )
@@ -220,10 +215,10 @@ cardToString card =
 
         suitOffset =
             case card.suit of
-                Heart ->
+                Spade ->
                     0x00
 
-                Spade ->
+                Heart ->
                     0x10
 
                 Diamond ->
@@ -276,6 +271,15 @@ cardToString card =
                     13
     in
     baseCard + suitOffset + rankOffset |> Char.fromCode |> String.fromChar
+
+
+createStack : List Card
+createStack =
+    -- cf
+    -- https://discourse.elm-lang.org/t/all-possible-combinations-of-a-product-type/4789/5
+    LE.lift2 Card
+        [ Heart, Spade, Diamond, Club ]
+        [ Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King ]
 
 
 
