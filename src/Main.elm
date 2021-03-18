@@ -1,12 +1,15 @@
 module Main exposing (..)
 
 import Browser
-import Element exposing (Element, alignLeft, alignRight, centerX, centerY, column, el, fill, height, padding, px, rgb, rgb255, row, spacing, text, width)
+import Element exposing (Element, alignLeft, alignRight, alignTop, centerX, centerY, column, el, fill, height, padding, px, rgb, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
+import List.Extra as LE
+import Random
+import Random.List as RL
 
 
 
@@ -14,12 +17,47 @@ import Html exposing (Html)
 
 
 type alias Model =
-    {}
+    { playerCards : List Card
+    , stackedCards : List Card
+    }
+
+
+type alias Card =
+    { suit : Suit
+    , rank : Rank
+    }
+
+
+type Suit
+    = Spade
+    | Heart
+    | Diamond
+    | Club
+
+
+type Rank
+    = Ace
+    | Two
+    | Three
+    | Four
+    | Five
+    | Six
+    | Seven
+    | Eight
+    | Nine
+    | Ten
+    | Jack
+    | Queen
+    | King
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( {}, Cmd.none )
+    ( { playerCards = []
+      , stackedCards = []
+      }
+    , createShuffledStack
+    )
 
 
 
@@ -28,11 +66,45 @@ init =
 
 type Msg
     = NoOp
+    | PlayerDrawsCard
+    | Deal
+    | NewStack (List Card)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        PlayerDrawsCard ->
+            let
+                drawnCard =
+                    List.take 1 model.stackedCards
+
+                newStack =
+                    List.drop 1 model.stackedCards
+
+                newHand =
+                    model.playerCards ++ drawnCard
+            in
+            ( { model
+                | stackedCards = newStack
+                , playerCards = newHand
+              }
+            , Cmd.none
+            )
+
+        NewStack newStack ->
+            ( { model
+                | stackedCards = newStack
+                , playerCards = []
+              }
+            , Cmd.none
+            )
+
+        Deal ->
+            ( model, createShuffledStack )
+
+        NoOp ->
+            ( model, Cmd.none )
 
 
 
@@ -75,9 +147,15 @@ gameDealerView model =
         ]
         [ el
             [ alignLeft
-            , Font.color <| rgb 1 1 0
+            , Font.color <| rgb 1 1 1
+            , width <| fill
             ]
-            (text "Dealer Hand")
+          <|
+            column
+                [ width <| fill ]
+                [ text "Remaining cards"
+                , text <| String.fromInt (List.length model.stackedCards)
+                ]
         , el [ alignRight ] <| text "Dealer Game Status"
         ]
 
@@ -86,13 +164,20 @@ gamePlayerView : Model -> Element msg
 gamePlayerView model =
     row
         [ width <| fill
+        , height <| px 150
         ]
-        [ el
+        [ column
             [ alignLeft
-            , Font.color <| rgb 1 1 0
+            , Font.color <| rgb 1 1 1
+            , width <| fill
+            , height <| fill
             ]
-            (text "Player Hand")
-        , el [ alignRight ] <| text "Player Game Status"
+            [ el [ alignTop ] (text "Player Hand")
+            , cardsView model.playerCards
+            ]
+        , column
+            [ alignRight ]
+            [ text "Player Game Status" ]
         ]
 
 
@@ -105,16 +190,16 @@ gameActionsView model =
         ]
         [ row [ centerX, centerY ] [ text "Game Actions" ]
         , row []
-            [ actionButton "Draw"
-            , actionButton "Hit"
-            , actionButton "Stand"
-            , actionButton "Deal"
+            [ actionButton "Draw" PlayerDrawsCard
+            , actionButton "Hit" NoOp
+            , actionButton "Stand" NoOp
+            , actionButton "Deal" Deal
             ]
         ]
 
 
-actionButton : String -> Element Msg
-actionButton label =
+actionButton : String -> Msg -> Element Msg
+actionButton label action =
     Input.button
         [ Background.color <| rgb255 238 238 238
         , Element.focused [ Background.color <| rgb255 238 0 238 ]
@@ -122,9 +207,132 @@ actionButton label =
         , width <| px 80
         , Border.rounded 10
         ]
-        { onPress = Nothing
+        { onPress = Just <| action
         , label = text label
         }
+
+
+
+---- CARD HELPERS ----
+
+
+cardsView : List Card -> Element msg
+cardsView cards =
+    row
+        [ Background.color <| rgb 1 1 1
+        ]
+    <|
+        List.map cardItem cards
+
+
+cardItem : Card -> Element msg
+cardItem card =
+    let
+        suitColor =
+            case card.suit of
+                Heart ->
+                    rgb255 205 0 0
+
+                Diamond ->
+                    rgb255 205 0 0
+
+                _ ->
+                    rgb255 20 20 20
+    in
+    el
+        [ Font.size 120
+        , Font.center
+        , Font.color <| suitColor
+        , Font.alignRight
+        ]
+        (text <| cardToString card)
+
+
+cardToString : Card -> String
+cardToString card =
+    -- Turn cards into Unicode symbols
+    -- https://en.wikipedia.org/wiki/Playing_cards_in_Unicode
+    let
+        baseCard =
+            0x0001F0A1
+
+        suitOffset =
+            case card.suit of
+                Spade ->
+                    0x00
+
+                Heart ->
+                    0x10
+
+                Diamond ->
+                    0x20
+
+                Club ->
+                    0x30
+
+        rankOffset =
+            case card.rank of
+                Ace ->
+                    0
+
+                Two ->
+                    1
+
+                Three ->
+                    2
+
+                Four ->
+                    3
+
+                Five ->
+                    4
+
+                Six ->
+                    5
+
+                Seven ->
+                    6
+
+                Eight ->
+                    7
+
+                Nine ->
+                    8
+
+                Ten ->
+                    9
+
+                Jack ->
+                    10
+
+                -- We don't want a Knight in our set
+                -- Knight -> 11
+                Queen ->
+                    12
+
+                King ->
+                    13
+    in
+    baseCard + suitOffset + rankOffset |> Char.fromCode |> String.fromChar
+
+
+createStack : List Card
+createStack =
+    -- cf
+    -- https://discourse.elm-lang.org/t/all-possible-combinations-of-a-product-type/4789/5
+    LE.lift2 Card
+        [ Heart, Spade, Diamond, Club ]
+        [ Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King ]
+
+
+cardShuffler : List a -> Random.Generator (List a)
+cardShuffler cards =
+    RL.shuffle cards
+
+
+createShuffledStack : Cmd Msg
+createShuffledStack =
+    Random.generate NewStack (cardShuffler createStack)
 
 
 
