@@ -1,7 +1,7 @@
 module Main exposing (..)
 
 import Browser
-import Element exposing (Element, alignLeft, alignRight, centerX, centerY, column, el, fill, height, padding, px, rgb, rgb255, row, spacing, text, width)
+import Element exposing (Element, alignLeft, alignRight, alignTop, centerX, centerY, column, el, fill, height, padding, px, rgb, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -67,6 +67,7 @@ init =
 type Msg
     = NoOp
     | PlayerDrawsCard
+    | Deal
     | NewStack (List Card)
 
 
@@ -98,6 +99,9 @@ update msg model =
               }
             , Cmd.none
             )
+
+        Deal ->
+            ( model, createShuffledStack )
 
         NoOp ->
             ( model, Cmd.none )
@@ -160,19 +164,20 @@ gamePlayerView : Model -> Element msg
 gamePlayerView model =
     row
         [ width <| fill
+        , height <| px 150
         ]
-        [ el
+        [ column
             [ alignLeft
             , Font.color <| rgb 1 1 1
             , width <| fill
+            , height <| fill
             ]
-          <|
-            column
-                [ width <| fill ]
-                [ text "Player Hand"
-                , cardsView model.playerCards
-                ]
-        , el [ alignRight ] <| text "Player Game Status"
+            [ el [ alignTop ] (text "Player Hand")
+            , cardsView model.playerCards
+            ]
+        , column
+            [ alignRight ]
+            [ text "Player Game Status" ]
         ]
 
 
@@ -188,7 +193,7 @@ gameActionsView model =
             [ actionButton "Draw" PlayerDrawsCard
             , actionButton "Hit" NoOp
             , actionButton "Stand" NoOp
-            , actionButton "Deal" NoOp
+            , actionButton "Deal" Deal
             ]
         ]
 
