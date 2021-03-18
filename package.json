@@ -1,0 +1,29 @@
+{
+  "name": "elm-blackjack",
+  "version": "1.0.0",
+  "description": "Blackjack game written in Elm",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "build": "elm-app build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MatsLanGoH/elm-blackjack.git"
+  },
+  "keywords": [
+    "elm",
+    "blackjack"
+  ],
+  "author": "Matthias Lambrecht",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MatsLanGoH/elm-blackjack/issues"
+  },
+  "homepage": "https://github.com/MatsLanGoH/elm-blackjack#readme",
+  "devDependencies": {
+    "create-elm-app": "^5.22.0"
+  }
+}
