@@ -8,6 +8,8 @@ import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
 import List.Extra as LE
+import Random
+import Random.List as RL
 
 
 
@@ -52,9 +54,9 @@ type Rank
 init : ( Model, Cmd Msg )
 init =
     ( { playerCards = []
-      , stackedCards = createStack
+      , stackedCards = []
       }
-    , Cmd.none
+    , createShuffledStack
     )
 
 
@@ -65,6 +67,7 @@ init =
 type Msg
     = NoOp
     | PlayerDrawsCard
+    | NewStack (List Card)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -84,6 +87,14 @@ update msg model =
             ( { model
                 | stackedCards = newStack
                 , playerCards = newHand
+              }
+            , Cmd.none
+            )
+
+        NewStack newStack ->
+            ( { model
+                | stackedCards = newStack
+                , playerCards = []
               }
             , Cmd.none
             )
@@ -307,6 +318,16 @@ createStack =
     LE.lift2 Card
         [ Heart, Spade, Diamond, Club ]
         [ Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King ]
+
+
+cardShuffler : List a -> Random.Generator (List a)
+cardShuffler cards =
+    RL.shuffle cards
+
+
+createShuffledStack : Cmd Msg
+createShuffledStack =
+    Random.generate NewStack (cardShuffler createStack)
 
 
 
