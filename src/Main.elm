@@ -182,6 +182,9 @@ gamePlayerView model =
                 [ text "Current Score: "
                 , text <| String.fromInt <| calculateScore model.playerCards
                 ]
+            , row []
+                [ text <| calculateResultString model.playerCards
+                ]
             ]
         ]
 
@@ -421,6 +424,15 @@ calculateScore cards =
 
         _ ->
             sumByRanks ranks
+
+
+calculateResultString : List Card -> String
+calculateResultString cards =
+    if calculateScore cards > 21 then
+        "YOU LOSE"
+
+    else
+        ""
 
 
 
