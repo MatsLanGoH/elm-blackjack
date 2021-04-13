@@ -19,6 +19,7 @@ import Random.List as RL
 type alias Model =
     { playerCards : List Card
     , stackedCards : List Card
+    , gameStatus : GameStatus
     }
 
 
@@ -51,10 +52,16 @@ type Rank
     | King
 
 
+type GameStatus
+    = Running
+    | Stopped
+
+
 init : ( Model, Cmd Msg )
 init =
     ( { playerCards = []
       , stackedCards = []
+      , gameStatus = Running
       }
     , createShuffledStack
     )
@@ -68,6 +75,7 @@ type Msg
     = NoOp
     | PlayerDrawsCard
     | Deal
+    | RestartGame
     | NewStack (List Card)
 
 
@@ -84,10 +92,14 @@ update msg model =
 
                 newHand =
                     model.playerCards ++ drawnCard
+
+                gameStatus =
+                    getGameStatus newHand
             in
             ( { model
                 | stackedCards = newStack
                 , playerCards = newHand
+                , gameStatus = gameStatus
               }
             , Cmd.none
             )
@@ -96,11 +108,20 @@ update msg model =
             ( { model
                 | stackedCards = newStack
                 , playerCards = []
+                , gameStatus = Running
               }
             , Cmd.none
             )
 
         Deal ->
+            ( { model
+                | playerCards = []
+                , gameStatus = Running
+              }
+            , Cmd.none
+            )
+
+        RestartGame ->
             ( model, createShuffledStack )
 
         NoOp ->
@@ -192,25 +213,49 @@ gamePlayerView model =
 gameActionsView : Model -> Element Msg
 gameActionsView model =
     -- TODO: Check actual Blackjack rules
+    let
+        drawButton =
+            if model.gameStatus == Running then
+                activeButton "Draw" PlayerDrawsCard
+
+            else
+                disabledButton "--" NoOp
+    in
     column
         [ centerX
         , spacing 10
         ]
         [ row [ centerX, centerY ] [ text "Game Actions" ]
         , row []
-            [ actionButton "Draw" PlayerDrawsCard
-            , actionButton "Hit" NoOp
-            , actionButton "Stand" NoOp
-            , actionButton "Deal" Deal
+            [ drawButton
+
+            -- , activeButton "Hit" NoOp
+            -- , activeButton "Stand" NoOp
+            , activeButton "Deal" Deal
+            , activeButton "Restart" RestartGame
             ]
         ]
 
 
-actionButton : String -> Msg -> Element Msg
-actionButton label action =
+activeButton : String -> Msg -> Element Msg
+activeButton label action =
     Input.button
         [ Background.color <| rgb255 238 238 238
         , Element.focused [ Background.color <| rgb255 238 0 238 ]
+        , height <| px 30
+        , width <| px 80
+        , Border.rounded 10
+        ]
+        { onPress = Just <| action
+        , label = text label
+        }
+
+
+disabledButton : String -> Msg -> Element Msg
+disabledButton label action =
+    Input.button
+        [ Background.color <| rgb255 238 238 238
+        , Font.color <| rgb255 44 44 44
         , height <| px 30
         , width <| px 80
         , Border.rounded 10
@@ -431,8 +476,20 @@ calculateResultString cards =
     if calculateScore cards > 21 then
         "YOU LOSE"
 
+    else if calculateScore cards == 21 then
+        "YOU WIN"
+
     else
         ""
+
+
+getGameStatus : List Card -> GameStatus
+getGameStatus cards =
+    if calculateScore cards >= 21 then
+        Stopped
+
+    else
+        Running
 
 
 
