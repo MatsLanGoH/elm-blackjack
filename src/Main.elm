@@ -392,27 +392,32 @@ sumByRanks ranks =
     ranks |> List.map rankValue |> List.sum
 
 
-calculateScore : List Card -> Int
-calculateScore cards =
+sumTwoWithAce : Rank -> Int
+sumTwoWithAce rank =
     {--
     Score rules:
         * If we have an Ace and either 10/J/Q/K, ace counts as 11
         * Otherwise Ace counts as 1 
     --}
+    if List.member rank [ Ten, Jack, Queen, King ] then
+        21
+
+    else
+        rankValue rank + rankValue Ace
+
+
+calculateScore : List Card -> Int
+calculateScore cards =
     let
         ranks =
             List.map (\card -> card.rank) cards
-
-        pictureRanks =
-            [ Ten, Jack, Queen, King ]
     in
-    case LE.remove Ace ranks of
-        [ card ] ->
-            if List.member card pictureRanks then
-                21
+    case ranks of
+        Ace :: [ card ] ->
+            sumTwoWithAce card
 
-            else
-                sumByRanks ranks
+        card :: [ Ace ] ->
+            sumTwoWithAce card
 
         _ ->
             sumByRanks ranks
