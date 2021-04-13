@@ -177,7 +177,12 @@ gamePlayerView model =
             ]
         , column
             [ alignRight ]
-            [ text "Player Game Status" ]
+            [ row [] [ text "Player Game Status" ]
+            , row []
+                [ text "Current Score: "
+                , text <| String.fromInt <| calculateScore model.playerCards
+                ]
+            ]
         ]
 
 
@@ -333,6 +338,84 @@ cardShuffler cards =
 createShuffledStack : Cmd Msg
 createShuffledStack =
     Random.generate NewStack (cardShuffler createStack)
+
+
+
+---- CARD SCORE LOGIC ----
+
+
+rankValue : Rank -> Int
+rankValue rank =
+    case rank of
+        Ace ->
+            1
+
+        Two ->
+            2
+
+        Three ->
+            3
+
+        Four ->
+            4
+
+        Five ->
+            5
+
+        Six ->
+            6
+
+        Seven ->
+            7
+
+        Eight ->
+            8
+
+        Nine ->
+            9
+
+        Ten ->
+            10
+
+        Jack ->
+            10
+
+        Queen ->
+            10
+
+        King ->
+            10
+
+
+sumByRanks : List Rank -> Int
+sumByRanks ranks =
+    ranks |> List.map rankValue |> List.sum
+
+
+calculateScore : List Card -> Int
+calculateScore cards =
+    {--
+    Score rules:
+        * If we have an Ace and either 10/J/Q/K, ace counts as 11
+        * Otherwise Ace counts as 1 
+    --}
+    let
+        ranks =
+            List.map (\card -> card.rank) cards
+
+        pictureRanks =
+            [ Ten, Jack, Queen, King ]
+    in
+    case LE.remove Ace ranks of
+        [ card ] ->
+            if List.member card pictureRanks then
+                21
+
+            else
+                sumByRanks ranks
+
+        _ ->
+            sumByRanks ranks
 
 
 
