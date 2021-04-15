@@ -19,6 +19,7 @@ import Random.List as RL
 type alias Model =
     { playerCards : List Card
     , stackedCards : List Card
+    , gameStatus : GameStatus
     }
 
 
@@ -51,10 +52,16 @@ type Rank
     | King
 
 
+type GameStatus
+    = Running
+    | Stopped
+
+
 init : ( Model, Cmd Msg )
 init =
     ( { playerCards = []
       , stackedCards = []
+      , gameStatus = Running
       }
     , createShuffledStack
     )
@@ -68,6 +75,7 @@ type Msg
     = NoOp
     | PlayerDrawsCard
     | Deal
+    | RestartGame
     | NewStack (List Card)
 
 
@@ -84,10 +92,14 @@ update msg model =
 
                 newHand =
                     model.playerCards ++ drawnCard
+
+                gameStatus =
+                    getGameStatus newHand
             in
             ( { model
                 | stackedCards = newStack
                 , playerCards = newHand
+                , gameStatus = gameStatus
               }
             , Cmd.none
             )
@@ -96,11 +108,20 @@ update msg model =
             ( { model
                 | stackedCards = newStack
                 , playerCards = []
+                , gameStatus = Running
               }
             , Cmd.none
             )
 
         Deal ->
+            ( { model
+                | playerCards = []
+                , gameStatus = Running
+              }
+            , Cmd.none
+            )
+
+        RestartGame ->
             ( model, createShuffledStack )
 
         NoOp ->
@@ -177,32 +198,64 @@ gamePlayerView model =
             ]
         , column
             [ alignRight ]
-            [ text "Player Game Status" ]
+            [ row [] [ text "Player Game Status" ]
+            , row []
+                [ text "Current Score: "
+                , text <| String.fromInt <| calculateScore model.playerCards
+                ]
+            , row []
+                [ text <| calculateResultString model.playerCards
+                ]
+            ]
         ]
 
 
 gameActionsView : Model -> Element Msg
 gameActionsView model =
     -- TODO: Check actual Blackjack rules
+    let
+        drawButton =
+            if model.gameStatus == Running then
+                activeButton "Draw" PlayerDrawsCard
+
+            else
+                disabledButton "--" NoOp
+    in
     column
         [ centerX
         , spacing 10
         ]
         [ row [ centerX, centerY ] [ text "Game Actions" ]
         , row []
-            [ actionButton "Draw" PlayerDrawsCard
-            , actionButton "Hit" NoOp
-            , actionButton "Stand" NoOp
-            , actionButton "Deal" Deal
+            [ drawButton
+
+            -- , activeButton "Hit" NoOp
+            -- , activeButton "Stand" NoOp
+            , activeButton "Deal" Deal
+            , activeButton "Restart" RestartGame
             ]
         ]
 
 
-actionButton : String -> Msg -> Element Msg
-actionButton label action =
+activeButton : String -> Msg -> Element Msg
+activeButton label action =
     Input.button
         [ Background.color <| rgb255 238 238 238
         , Element.focused [ Background.color <| rgb255 238 0 238 ]
+        , height <| px 30
+        , width <| px 80
+        , Border.rounded 10
+        ]
+        { onPress = Just <| action
+        , label = text label
+        }
+
+
+disabledButton : String -> Msg -> Element Msg
+disabledButton label action =
+    Input.button
+        [ Background.color <| rgb255 238 238 238
+        , Font.color <| rgb255 44 44 44
         , height <| px 30
         , width <| px 80
         , Border.rounded 10
@@ -333,6 +386,110 @@ cardShuffler cards =
 createShuffledStack : Cmd Msg
 createShuffledStack =
     Random.generate NewStack (cardShuffler createStack)
+
+
+
+---- CARD SCORE LOGIC ----
+
+
+rankValue : Rank -> Int
+rankValue rank =
+    case rank of
+        Ace ->
+            1
+
+        Two ->
+            2
+
+        Three ->
+            3
+
+        Four ->
+            4
+
+        Five ->
+            5
+
+        Six ->
+            6
+
+        Seven ->
+            7
+
+        Eight ->
+            8
+
+        Nine ->
+            9
+
+        Ten ->
+            10
+
+        Jack ->
+            10
+
+        Queen ->
+            10
+
+        King ->
+            10
+
+
+sumByRanks : List Rank -> Int
+sumByRanks ranks =
+    ranks |> List.map rankValue |> List.sum
+
+
+sumTwoWithAce : Rank -> Int
+sumTwoWithAce rank =
+    {--
+    Score rules:
+        * If we have an Ace and either 10/J/Q/K, ace counts as 11
+        * Otherwise Ace counts as 1 
+    --}
+    if List.member rank [ Ten, Jack, Queen, King ] then
+        21
+
+    else
+        rankValue rank + rankValue Ace
+
+
+calculateScore : List Card -> Int
+calculateScore cards =
+    let
+        ranks =
+            List.map (\card -> card.rank) cards
+    in
+    case ranks of
+        Ace :: [ card ] ->
+            sumTwoWithAce card
+
+        card :: [ Ace ] ->
+            sumTwoWithAce card
+
+        _ ->
+            sumByRanks ranks
+
+
+calculateResultString : List Card -> String
+calculateResultString cards =
+    if calculateScore cards > 21 then
+        "YOU LOSE"
+
+    else if calculateScore cards == 21 then
+        "YOU WIN"
+
+    else
+        ""
+
+
+getGameStatus : List Card -> GameStatus
+getGameStatus cards =
+    if calculateScore cards >= 21 then
+        Stopped
+
+    else
+        Running
 
 
 
