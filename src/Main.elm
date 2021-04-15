@@ -224,19 +224,12 @@ gameProgressView model playertype =
 viewStatus : Model -> PlayerType -> Element msg
 viewStatus model playerType =
     let
-        label =
+        viewHand =
             if playerType == Player then
-                "Player"
+                viewPlayerHand model.playerHand
 
             else
-                "Dealer"
-
-        hand =
-            if playerType == Player then
-                model.playerHand
-
-            else
-                model.dealerHand
+                viewDealerHand model.dealerHand model.gameStatus
     in
     row
         [ width <| fill
@@ -244,22 +237,40 @@ viewStatus model playerType =
         , padding 10
         , Background.color <| rgb255 30 222 30
         ]
-        [ viewHand hand label
-        , viewScore hand
-        ]
+        viewHand
 
 
-viewHand : List Card -> String -> Element msg
-viewHand hand label =
-    column
+viewPlayerHand : List Card -> List (Element msg)
+viewPlayerHand hand =
+    [ column
         [ alignLeft
         , Font.color <| rgb 1 1 1
         , width <| fill
         , height <| fill
         ]
-        [ el [ alignTop ] (text <| label ++ " Hand")
+        [ el [ alignTop ] (text <| "Player Hand")
         , cardsView hand
         ]
+    , viewScore hand
+    ]
+
+
+viewDealerHand : List Card -> GameStatus -> List (Element msg)
+viewDealerHand hand gamestatus =
+    [ column
+        [ alignLeft
+        , Font.color <| rgb 1 1 1
+        , width <| fill
+        , height <| fill
+        ]
+        [ el [ alignTop ] (text <| "Dealer Hand")
+        , dealerCardsView hand gamestatus
+        ]
+    , column []
+        [ text "Delete me"
+        , viewScore hand
+        ]
+    ]
 
 
 viewScore : List Card -> Element msg
@@ -344,6 +355,29 @@ cardsView cards =
         List.map cardItem cards
 
 
+dealerCardsView : List Card -> GameStatus -> Element msg
+dealerCardsView cards gamestatus =
+    if gamestatus == Stopped then
+        cardsView cards
+
+    else
+        let
+            holeCard =
+                List.take 1 cards
+
+            otherCards =
+                List.drop 1 cards
+        in
+        row
+            [ Background.color <| rgb 1 1 1
+            ]
+        <|
+            List.concat
+                [ List.map holeCardItem holeCard
+                , List.map cardItem otherCards
+                ]
+
+
 cardItem : Card -> Element msg
 cardItem card =
     let
@@ -365,6 +399,34 @@ cardItem card =
         , Font.alignRight
         ]
         (text <| cardToString card)
+
+
+holeCardItem : Card -> Element msg
+holeCardItem card =
+    let
+        suitColor =
+            case card.suit of
+                Heart ->
+                    rgb255 205 0 0
+
+                Diamond ->
+                    rgb255 205 0 0
+
+                _ ->
+                    rgb255 20 20 20
+    in
+    el
+        [ Font.size 120
+        , Font.center
+        , Font.color <| suitColor
+        , Font.alignRight
+        ]
+        (text <| holeCardString)
+
+
+holeCardString : String
+holeCardString =
+    0x0001F0A0 |> Char.fromCode |> String.fromChar
 
 
 cardToString : Card -> String
