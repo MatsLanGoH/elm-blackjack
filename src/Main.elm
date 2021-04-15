@@ -1,7 +1,28 @@
 module Main exposing (..)
 
 import Browser
-import Element exposing (Element, alignLeft, alignRight, alignTop, centerX, centerY, column, el, fill, height, padding, px, rgb, rgb255, row, spacing, text, width)
+import Element
+    exposing
+        ( Element
+        , alignLeft
+        , alignRight
+        , alignTop
+        , centerX
+        , centerY
+        , column
+        , el
+        , fill
+        , height
+        , none
+        , padding
+        , px
+        , rgb
+        , rgb255
+        , row
+        , spacing
+        , text
+        , width
+        )
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -61,6 +82,12 @@ type PlayerType
 type GameStatus
     = Running
     | Stopped
+
+
+type GameResult
+    = Draw
+    | PlayerWins
+    | DealerWins
 
 
 init : ( Model, Cmd Msg )
@@ -205,25 +232,44 @@ gameInfoView : Model -> Element msg
 gameInfoView model =
     row
         [ width <| fill
+        , Font.color <| rgb 1 1 1
         ]
-        [ el
+        [ column
             [ alignLeft
-            , Font.color <| rgb 1 1 1
             , width <| fill
             ]
-          <|
-            column
-                [ width <| fill ]
-                [ text "Remaining cards"
-                , text <| String.fromInt (List.length model.stackedCards)
-                ]
-        , el [ alignRight ] <| text "Dealer Game Status"
+            [ text <| "Remaining cards: " ++ String.fromInt (List.length model.stackedCards)
+            ]
+        , column
+            [ height <| fill
+            , width <| fill
+            ]
+            [ text <| gameResultView model ]
         ]
 
 
 gameProgressView : Model -> PlayerType -> Element msg
 gameProgressView model playertype =
     viewStatus model playertype
+
+
+gameResultView : Model -> String
+gameResultView model =
+    if model.gameStatus == Running then
+        ""
+
+    else
+        "Result: "
+            ++ (case getGameResult model of
+                    Draw ->
+                        "Draw"
+
+                    PlayerWins ->
+                        "You win!"
+
+                    DealerWins ->
+                        "Dealer wins!"
+               )
 
 
 viewStatus : Model -> PlayerType -> Element msg
@@ -262,6 +308,14 @@ viewPlayerHand hand =
 
 viewDealerHand : List Card -> GameStatus -> List (Element msg)
 viewDealerHand hand gamestatus =
+    let
+        dealerScore =
+            if gamestatus == Running then
+                none
+
+            else
+                viewScore hand
+    in
     [ column
         [ alignLeft
         , Font.color <| rgb 1 1 1
@@ -271,10 +325,7 @@ viewDealerHand hand gamestatus =
         [ el [ alignTop ] (text <| "Dealer Hand")
         , dealerCardsView hand gamestatus
         ]
-    , column []
-        [ text "Delete me"
-        , viewScore hand
-        ]
+    , dealerScore
     ]
 
 
@@ -285,9 +336,6 @@ viewScore hand =
         [ row []
             [ text "Current Score: "
             , text <| String.fromInt <| calculateScore hand
-            ]
-        , row []
-            [ text <| calculateResultString hand
             ]
         ]
 
@@ -614,6 +662,46 @@ calculateResultString cards =
 
     else
         ""
+
+
+
+--- RESULT CALCULATION ---
+
+
+handIsOver21 : List Card -> Bool
+handIsOver21 cards =
+    calculateScore cards > 21
+
+
+handIs21 : List Card -> Bool
+handIs21 cards =
+    calculateScore cards == 21
+
+
+getGameResult : Model -> GameResult
+getGameResult model =
+    {- FIXME: 両方とも21未満のまま終わったときのケース -}
+    let
+        playerWins =
+            handIs21 model.playerHand
+                || (not <| handIsOver21 model.playerHand)
+
+        dealerWins =
+            handIs21 model.dealerHand
+                || (not <| handIsOver21 model.dealerHand)
+    in
+    case ( playerWins, dealerWins ) of
+        ( False, False ) ->
+            Draw
+
+        ( True, True ) ->
+            Draw
+
+        ( True, False ) ->
+            PlayerWins
+
+        ( False, True ) ->
+            DealerWins
 
 
 getGameStatus : Model -> GameStatus
