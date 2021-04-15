@@ -1,7 +1,28 @@
 module Main exposing (..)
 
 import Browser
-import Element exposing (Element, alignLeft, alignRight, alignTop, centerX, centerY, column, el, fill, height, padding, px, rgb, rgb255, row, spacing, text, width)
+import Element
+    exposing
+        ( Element
+        , alignLeft
+        , alignRight
+        , alignTop
+        , centerX
+        , centerY
+        , column
+        , el
+        , fill
+        , height
+        , none
+        , padding
+        , px
+        , rgb
+        , rgb255
+        , row
+        , spacing
+        , text
+        , width
+        )
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -17,7 +38,8 @@ import Random.List as RL
 
 
 type alias Model =
-    { playerCards : List Card
+    { playerHand : List Card
+    , dealerHand : List Card
     , stackedCards : List Card
     , gameStatus : GameStatus
     }
@@ -52,14 +74,26 @@ type Rank
     | King
 
 
+type PlayerType
+    = Player
+    | Dealer
+
+
 type GameStatus
     = Running
     | Stopped
 
 
+type GameResult
+    = Draw
+    | PlayerWins
+    | DealerWins
+
+
 init : ( Model, Cmd Msg )
 init =
-    ( { playerCards = []
+    ( { playerHand = []
+      , dealerHand = []
       , stackedCards = []
       , gameStatus = Running
       }
@@ -84,30 +118,20 @@ update msg model =
     case msg of
         PlayerDrawsCard ->
             let
-                drawnCard =
-                    List.take 1 model.stackedCards
-
-                newStack =
-                    List.drop 1 model.stackedCards
-
-                newHand =
-                    model.playerCards ++ drawnCard
-
-                gameStatus =
-                    getGameStatus newHand
+                {- Temporary: Player, Dealer both draw at the same time -}
+                newModel =
+                    drawCard Player model
+                        |> drawCard Dealer
             in
-            ( { model
-                | stackedCards = newStack
-                , playerCards = newHand
-                , gameStatus = gameStatus
-              }
+            ( newModel |> updateGameStatus
             , Cmd.none
             )
 
         NewStack newStack ->
             ( { model
                 | stackedCards = newStack
-                , playerCards = []
+                , playerHand = []
+                , dealerHand = []
                 , gameStatus = Running
               }
             , Cmd.none
@@ -115,9 +139,11 @@ update msg model =
 
         Deal ->
             ( { model
-                | playerCards = []
+                | playerHand = []
+                , dealerHand = []
                 , gameStatus = Running
               }
+                |> dealInitialHand
             , Cmd.none
             )
 
@@ -126,6 +152,45 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+
+
+--- UPDATE HELPERS ---
+
+
+drawCard : PlayerType -> Model -> Model
+drawCard playerType model =
+    let
+        drawnCard =
+            List.take 1 model.stackedCards
+
+        newStack =
+            List.drop 1 model.stackedCards
+    in
+    if playerType == Player then
+        { model
+            | playerHand = model.playerHand ++ drawnCard
+            , stackedCards = newStack
+        }
+
+    else
+        { model
+            | dealerHand = model.dealerHand ++ drawnCard
+            , stackedCards = newStack
+        }
+
+
+dealInitialHand : Model -> Model
+dealInitialHand model =
+    drawCard Player model
+        |> drawCard Dealer
+        |> drawCard Player
+        |> drawCard Dealer
+
+
+updateGameStatus : Model -> Model
+updateGameStatus model =
+    { model | gameStatus = getGameStatus model }
 
 
 
@@ -144,10 +209,12 @@ gameView model =
         [ Background.color (rgb255 0 185 0)
         , width <| fill
         , padding 10
+        , spacing 10
         ]
         [ gameHeaderView
-        , gameDealerView model
-        , gamePlayerView model
+        , gameInfoView model
+        , gameProgressView model Dealer
+        , gameProgressView model Player
         , gameActionsView model
         ]
 
@@ -161,51 +228,114 @@ gameHeaderView =
         ]
 
 
-gameDealerView : Model -> Element msg
-gameDealerView model =
+gameInfoView : Model -> Element msg
+gameInfoView model =
     row
         [ width <| fill
-        ]
-        [ el
-            [ alignLeft
-            , Font.color <| rgb 1 1 1
-            , width <| fill
-            ]
-          <|
-            column
-                [ width <| fill ]
-                [ text "Remaining cards"
-                , text <| String.fromInt (List.length model.stackedCards)
-                ]
-        , el [ alignRight ] <| text "Dealer Game Status"
-        ]
-
-
-gamePlayerView : Model -> Element msg
-gamePlayerView model =
-    row
-        [ width <| fill
-        , height <| px 150
+        , Font.color <| rgb 1 1 1
         ]
         [ column
             [ alignLeft
-            , Font.color <| rgb 1 1 1
             , width <| fill
-            , height <| fill
             ]
-            [ el [ alignTop ] (text "Player Hand")
-            , cardsView model.playerCards
+            [ text <| "Remaining cards: " ++ String.fromInt (List.length model.stackedCards)
             ]
         , column
-            [ alignRight ]
-            [ row [] [ text "Player Game Status" ]
-            , row []
-                [ text "Current Score: "
-                , text <| String.fromInt <| calculateScore model.playerCards
-                ]
-            , row []
-                [ text <| calculateResultString model.playerCards
-                ]
+            [ height <| fill
+            , width <| fill
+            ]
+            [ text <| gameResultView model ]
+        ]
+
+
+gameProgressView : Model -> PlayerType -> Element msg
+gameProgressView model playertype =
+    viewStatus model playertype
+
+
+gameResultView : Model -> String
+gameResultView model =
+    if model.gameStatus == Running then
+        ""
+
+    else
+        "Result: "
+            ++ (case getGameResult model of
+                    Draw ->
+                        "Draw"
+
+                    PlayerWins ->
+                        "You win!"
+
+                    DealerWins ->
+                        "Dealer wins!"
+               )
+
+
+viewStatus : Model -> PlayerType -> Element msg
+viewStatus model playerType =
+    let
+        viewHand =
+            if playerType == Player then
+                viewPlayerHand model.playerHand
+
+            else
+                viewDealerHand model.dealerHand model.gameStatus
+    in
+    row
+        [ width <| fill
+        , height <| px 150
+        , padding 10
+        , Background.color <| rgb255 30 222 30
+        ]
+        viewHand
+
+
+viewPlayerHand : List Card -> List (Element msg)
+viewPlayerHand hand =
+    [ column
+        [ alignLeft
+        , Font.color <| rgb 1 1 1
+        , width <| fill
+        , height <| fill
+        ]
+        [ el [ alignTop ] (text <| "Player Hand")
+        , cardsView hand
+        ]
+    , viewScore hand
+    ]
+
+
+viewDealerHand : List Card -> GameStatus -> List (Element msg)
+viewDealerHand hand gamestatus =
+    let
+        dealerScore =
+            if gamestatus == Running then
+                none
+
+            else
+                viewScore hand
+    in
+    [ column
+        [ alignLeft
+        , Font.color <| rgb 1 1 1
+        , width <| fill
+        , height <| fill
+        ]
+        [ el [ alignTop ] (text <| "Dealer Hand")
+        , dealerCardsView hand gamestatus
+        ]
+    , dealerScore
+    ]
+
+
+viewScore : List Card -> Element msg
+viewScore hand =
+    column
+        [ alignRight ]
+        [ row []
+            [ text "Current Score: "
+            , text <| String.fromInt <| calculateScore hand
             ]
         ]
 
@@ -278,6 +408,29 @@ cardsView cards =
         List.map cardItem cards
 
 
+dealerCardsView : List Card -> GameStatus -> Element msg
+dealerCardsView cards gamestatus =
+    if gamestatus == Stopped then
+        cardsView cards
+
+    else
+        let
+            holeCard =
+                List.take 1 cards
+
+            otherCards =
+                List.drop 1 cards
+        in
+        row
+            [ Background.color <| rgb 1 1 1
+            ]
+        <|
+            List.concat
+                [ List.map holeCardItem holeCard
+                , List.map cardItem otherCards
+                ]
+
+
 cardItem : Card -> Element msg
 cardItem card =
     let
@@ -299,6 +452,34 @@ cardItem card =
         , Font.alignRight
         ]
         (text <| cardToString card)
+
+
+holeCardItem : Card -> Element msg
+holeCardItem card =
+    let
+        suitColor =
+            case card.suit of
+                Heart ->
+                    rgb255 205 0 0
+
+                Diamond ->
+                    rgb255 205 0 0
+
+                _ ->
+                    rgb255 20 20 20
+    in
+    el
+        [ Font.size 120
+        , Font.center
+        , Font.color <| suitColor
+        , Font.alignRight
+        ]
+        (text <| holeCardString)
+
+
+holeCardString : String
+holeCardString =
+    0x0001F0A0 |> Char.fromCode |> String.fromChar
 
 
 cardToString : Card -> String
@@ -483,9 +664,52 @@ calculateResultString cards =
         ""
 
 
-getGameStatus : List Card -> GameStatus
-getGameStatus cards =
-    if calculateScore cards >= 21 then
+
+--- RESULT CALCULATION ---
+
+
+handIsOver21 : List Card -> Bool
+handIsOver21 cards =
+    calculateScore cards > 21
+
+
+handIs21 : List Card -> Bool
+handIs21 cards =
+    calculateScore cards == 21
+
+
+getGameResult : Model -> GameResult
+getGameResult model =
+    {- FIXME: 両方とも21未満のまま終わったときのケース -}
+    let
+        playerWins =
+            handIs21 model.playerHand
+                || (not <| handIsOver21 model.playerHand)
+
+        dealerWins =
+            handIs21 model.dealerHand
+                || (not <| handIsOver21 model.dealerHand)
+    in
+    case ( playerWins, dealerWins ) of
+        ( False, False ) ->
+            Draw
+
+        ( True, True ) ->
+            Draw
+
+        ( True, False ) ->
+            PlayerWins
+
+        ( False, True ) ->
+            DealerWins
+
+
+getGameStatus : Model -> GameStatus
+getGameStatus model =
+    if calculateScore model.playerHand >= 21 then
+        Stopped
+
+    else if calculateScore model.dealerHand >= 21 then
         Stopped
 
     else
