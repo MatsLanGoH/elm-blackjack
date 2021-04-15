@@ -39,7 +39,9 @@ import Random.List as RL
 
 type alias Model =
     { playerHand : List Card
+    , playerLastMove : Move
     , dealerHand : List Card
+    , dealerLastMove : Move
     , stackedCards : List Card
     , gameStatus : GameStatus
     }
@@ -49,6 +51,12 @@ type alias Card =
     { suit : Suit
     , rank : Rank
     }
+
+
+type Move
+    = None
+    | Hit
+    | Stand
 
 
 type Suit
@@ -90,13 +98,20 @@ type GameResult
     | DealerWins
 
 
+initialModel : Model
+initialModel =
+    { playerHand = []
+    , playerLastMove = None
+    , dealerHand = []
+    , dealerLastMove = None
+    , stackedCards = []
+    , gameStatus = Stopped
+    }
+
+
 init : ( Model, Cmd Msg )
 init =
-    ( { playerHand = []
-      , dealerHand = []
-      , stackedCards = []
-      , gameStatus = Stopped
-      }
+    ( initialModel
     , createShuffledStack
     )
 
@@ -120,35 +135,30 @@ update msg model =
         ClickedHitButton ->
             ( model
                 |> drawCard Player
-                |> drawCard Dealer
+                |> dealerMove
                 |> updateGameStatus
             , Cmd.none
             )
 
         ClickedStandButton ->
             ( model
-                |> drawCard Dealer
+                |> stand Player
+                |> dealerMove
                 |> updateGameStatus
             , Cmd.none
             )
 
         NewStack newStack ->
-            ( { model
+            ( { initialModel
                 | stackedCards = newStack
-                , playerHand = []
-                , dealerHand = []
-                , gameStatus = Stopped
               }
             , Cmd.none
             )
 
         Deal ->
-            ( { model
-                | playerHand = []
-                , dealerHand = []
-                , gameStatus = Running
-              }
+            ( { model | gameStatus = Running }
                 |> dealInitialHand
+                |> updateGameStatus
             , Cmd.none
             )
 
@@ -175,19 +185,42 @@ drawCard playerType model =
     if playerType == Player then
         { model
             | playerHand = model.playerHand ++ drawnCard
+            , playerLastMove = Hit
             , stackedCards = newStack
         }
 
     else
         { model
             | dealerHand = model.dealerHand ++ drawnCard
+            , dealerLastMove = Hit
             , stackedCards = newStack
         }
 
 
+stand : PlayerType -> Model -> Model
+stand playerType model =
+    if playerType == Player then
+        { model
+            | playerLastMove = Stand
+        }
+
+    else
+        { model | dealerLastMove = Stand }
+
+
+dealerMove : Model -> Model
+dealerMove model =
+    if calculateScore model.dealerHand <= 16 then
+        drawCard Dealer model
+
+    else
+        stand Dealer model
+
+
 dealInitialHand : Model -> Model
 dealInitialHand model =
-    drawCard Player model
+    { model | playerHand = [], dealerHand = [] }
+        |> drawCard Player
         |> drawCard Dealer
         |> drawCard Player
         |> drawCard Dealer
@@ -689,27 +722,52 @@ getGameResult : Model -> GameResult
 getGameResult model =
     {- FIXME: 両方とも21未満のまま終わったときのケース -}
     {- FIXME: そもそもロジックあっていない -}
-    let
-        playerWins =
-            handIs21 model.playerHand
-                || (not <| handIsOver21 model.playerHand)
+    if handIs21 model.playerHand && handIs21 model.dealerHand then
+        Draw
 
-        dealerWins =
-            handIs21 model.dealerHand
-                || (not <| handIsOver21 model.dealerHand)
-    in
-    case ( playerWins, dealerWins ) of
-        ( False, False ) ->
-            Draw
+    else if handIs21 model.playerHand then
+        PlayerWins
 
-        ( True, True ) ->
-            Draw
+    else if handIs21 model.dealerHand then
+        DealerWins
 
-        ( True, False ) ->
-            PlayerWins
+    else if handIsOver21 model.playerHand && handIsOver21 model.dealerHand then
+        Draw
 
-        ( False, True ) ->
-            DealerWins
+    else if handIsOver21 model.playerHand then
+        DealerWins
+
+    else if handIsOver21 model.dealerHand then
+        PlayerWins
+
+    else if calculateScore model.playerHand == calculateScore model.dealerHand then
+        Draw
+
+    else if calculateScore model.playerHand < calculateScore model.dealerHand then
+        DealerWins
+
+    else
+        PlayerWins
+
+
+
+-- let
+--     playerWins =
+--         handIs21 model.playerHand
+--             || (not <| handIsOver21 model.playerHand)
+--     dealerWins =
+--         handIs21 model.dealerHand
+--             || (not <| handIsOver21 model.dealerHand)
+-- in
+-- case ( playerWins, dealerWins ) of
+--     ( False, False ) ->
+--         Draw
+--     ( True, True ) ->
+--         Draw
+--     ( True, False ) ->
+--         PlayerWins
+--     ( False, True ) ->
+--         DealerWins
 
 
 getGameStatus : Model -> GameStatus
@@ -718,6 +776,9 @@ getGameStatus model =
         Stopped
 
     else if calculateScore model.dealerHand >= 21 then
+        Stopped
+
+    else if model.dealerLastMove == Stand && model.playerLastMove == Stand then
         Stopped
 
     else
