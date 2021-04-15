@@ -91,16 +91,12 @@ update msg model =
     case msg of
         PlayerDrawsCard ->
             let
+                {- Temporary: Player, Dealer both draw at the same time -}
                 newModel =
                     drawCard Player model
-
-                gameStatus =
-                    getGameStatus newModel
-
-                updatedModel =
-                    { newModel | gameStatus = gameStatus }
+                        |> drawCard Dealer
             in
-            ( updatedModel
+            ( newModel |> updateGameStatus
             , Cmd.none
             )
 
@@ -131,6 +127,10 @@ update msg model =
             ( model, Cmd.none )
 
 
+
+--- UPDATE HELPERS ---
+
+
 drawCard : PlayerType -> Model -> Model
 drawCard playerType model =
     let
@@ -159,6 +159,11 @@ dealInitialHand model =
         |> drawCard Dealer
         |> drawCard Player
         |> drawCard Dealer
+
+
+updateGameStatus : Model -> Model
+updateGameStatus model =
+    { model | gameStatus = getGameStatus model }
 
 
 
