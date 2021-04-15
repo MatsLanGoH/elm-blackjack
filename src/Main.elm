@@ -95,7 +95,7 @@ init =
     ( { playerHand = []
       , dealerHand = []
       , stackedCards = []
-      , gameStatus = Running
+      , gameStatus = Stopped
       }
     , createShuffledStack
     )
@@ -107,7 +107,8 @@ init =
 
 type Msg
     = NoOp
-    | PlayerDrawsCard
+    | ClickedHitButton
+    | ClickedStandButton
     | Deal
     | RestartGame
     | NewStack (List Card)
@@ -116,14 +117,18 @@ type Msg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        PlayerDrawsCard ->
-            let
-                {- Temporary: Player, Dealer both draw at the same time -}
-                newModel =
-                    drawCard Player model
-                        |> drawCard Dealer
-            in
-            ( newModel |> updateGameStatus
+        ClickedHitButton ->
+            ( model
+                |> drawCard Player
+                |> drawCard Dealer
+                |> updateGameStatus
+            , Cmd.none
+            )
+
+        ClickedStandButton ->
+            ( model
+                |> drawCard Dealer
+                |> updateGameStatus
             , Cmd.none
             )
 
@@ -132,7 +137,7 @@ update msg model =
                 | stackedCards = newStack
                 , playerHand = []
                 , dealerHand = []
-                , gameStatus = Running
+                , gameStatus = Stopped
               }
             , Cmd.none
             )
@@ -344,26 +349,28 @@ gameActionsView : Model -> Element Msg
 gameActionsView model =
     -- TODO: Check actual Blackjack rules
     let
-        drawButton =
+        activeButtons =
             if model.gameStatus == Running then
-                activeButton "Draw" PlayerDrawsCard
+                [ activeButton "Hit" ClickedHitButton
+                , activeButton "Stand" ClickedStandButton
+                , disabledButton "--" NoOp
+                ]
 
             else
-                disabledButton "--" NoOp
+                [ disabledButton "--" NoOp
+                , disabledButton "--" NoOp
+                , activeButton "Deal" Deal
+                ]
     in
     column
         [ centerX
         , spacing 10
         ]
         [ row [ centerX, centerY ] [ text "Game Actions" ]
-        , row []
-            [ drawButton
-
-            -- , activeButton "Hit" NoOp
-            -- , activeButton "Stand" NoOp
-            , activeButton "Deal" Deal
-            , activeButton "Restart" RestartGame
-            ]
+        , row [] <|
+            activeButtons
+                ++ [ activeButton "Restart" RestartGame
+                   ]
         ]
 
 
@@ -681,6 +688,7 @@ handIs21 cards =
 getGameResult : Model -> GameResult
 getGameResult model =
     {- FIXME: 両方とも21未満のまま終わったときのケース -}
+    {- FIXME: そもそもロジックあっていない -}
     let
         playerWins =
             handIs21 model.playerHand
