@@ -91,24 +91,16 @@ update msg model =
     case msg of
         PlayerDrawsCard ->
             let
-                drawnCard =
-                    List.take 1 model.stackedCards
-
-                updatedStack =
-                    List.drop 1 model.stackedCards
-
-                newHand =
-                    model.playerHand ++ drawnCard
+                newModel =
+                    drawCard Player model
 
                 gameStatus =
-                    getGameStatus newHand
+                    getGameStatus newModel
+
+                updatedModel =
+                    { newModel | gameStatus = gameStatus }
             in
-            ( { model
-                | stackedCards = updatedStack
-                , playerHand = newHand
-                , dealerHand = []
-                , gameStatus = gameStatus
-              }
+            ( updatedModel
             , Cmd.none
             )
 
@@ -128,6 +120,7 @@ update msg model =
                 , dealerHand = []
                 , gameStatus = Running
               }
+                |> dealInitialHand
             , Cmd.none
             )
 
@@ -136,6 +129,36 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
+
+
+drawCard : PlayerType -> Model -> Model
+drawCard playerType model =
+    let
+        drawnCard =
+            List.take 1 model.stackedCards
+
+        newStack =
+            List.drop 1 model.stackedCards
+    in
+    if playerType == Player then
+        { model
+            | playerHand = model.playerHand ++ drawnCard
+            , stackedCards = newStack
+        }
+
+    else
+        { model
+            | dealerHand = model.dealerHand ++ drawnCard
+            , stackedCards = newStack
+        }
+
+
+dealInitialHand : Model -> Model
+dealInitialHand model =
+    drawCard Player model
+        |> drawCard Dealer
+        |> drawCard Player
+        |> drawCard Dealer
 
 
 
@@ -526,9 +549,12 @@ calculateResultString cards =
         ""
 
 
-getGameStatus : List Card -> GameStatus
-getGameStatus cards =
-    if calculateScore cards >= 21 then
+getGameStatus : Model -> GameStatus
+getGameStatus model =
+    if calculateScore model.playerHand >= 21 then
+        Stopped
+
+    else if calculateScore model.dealerHand >= 21 then
         Stopped
 
     else
