@@ -17,7 +17,8 @@ import Random.List as RL
 
 
 type alias Model =
-    { playerCards : List Card
+    { playerHand : List Card
+    , dealerHand : List Card
     , stackedCards : List Card
     , gameStatus : GameStatus
     }
@@ -52,6 +53,11 @@ type Rank
     | King
 
 
+type PlayerType
+    = Player
+    | Dealer
+
+
 type GameStatus
     = Running
     | Stopped
@@ -59,7 +65,8 @@ type GameStatus
 
 init : ( Model, Cmd Msg )
 init =
-    ( { playerCards = []
+    ( { playerHand = []
+      , dealerHand = []
       , stackedCards = []
       , gameStatus = Running
       }
@@ -87,18 +94,19 @@ update msg model =
                 drawnCard =
                     List.take 1 model.stackedCards
 
-                newStack =
+                updatedStack =
                     List.drop 1 model.stackedCards
 
                 newHand =
-                    model.playerCards ++ drawnCard
+                    model.playerHand ++ drawnCard
 
                 gameStatus =
                     getGameStatus newHand
             in
             ( { model
-                | stackedCards = newStack
-                , playerCards = newHand
+                | stackedCards = updatedStack
+                , playerHand = newHand
+                , dealerHand = []
                 , gameStatus = gameStatus
               }
             , Cmd.none
@@ -107,7 +115,8 @@ update msg model =
         NewStack newStack ->
             ( { model
                 | stackedCards = newStack
-                , playerCards = []
+                , playerHand = []
+                , dealerHand = []
                 , gameStatus = Running
               }
             , Cmd.none
@@ -115,7 +124,8 @@ update msg model =
 
         Deal ->
             ( { model
-                | playerCards = []
+                | playerHand = []
+                , dealerHand = []
                 , gameStatus = Running
               }
             , Cmd.none
@@ -144,10 +154,12 @@ gameView model =
         [ Background.color (rgb255 0 185 0)
         , width <| fill
         , padding 10
+        , spacing 10
         ]
         [ gameHeaderView
-        , gameDealerView model
-        , gamePlayerView model
+        , gameInfoView model
+        , gameProgressView model Dealer
+        , gameProgressView model Player
         , gameActionsView model
         ]
 
@@ -161,8 +173,8 @@ gameHeaderView =
         ]
 
 
-gameDealerView : Model -> Element msg
-gameDealerView model =
+gameInfoView : Model -> Element msg
+gameInfoView model =
     row
         [ width <| fill
         ]
@@ -181,31 +193,62 @@ gameDealerView model =
         ]
 
 
-gamePlayerView : Model -> Element msg
-gamePlayerView model =
+gameProgressView : Model -> PlayerType -> Element msg
+gameProgressView model playertype =
+    viewStatus model playertype
+
+
+viewStatus : Model -> PlayerType -> Element msg
+viewStatus model playerType =
+    let
+        label =
+            if playerType == Player then
+                "Player"
+
+            else
+                "Dealer"
+
+        hand =
+            if playerType == Player then
+                model.playerHand
+
+            else
+                model.dealerHand
+    in
     row
         [ width <| fill
         , height <| px 150
+        , padding 10
+        , Background.color <| rgb255 30 222 30
         ]
-        [ column
-            [ alignLeft
-            , Font.color <| rgb 1 1 1
-            , width <| fill
-            , height <| fill
+        [ viewHand hand label
+        , viewScore hand
+        ]
+
+
+viewHand : List Card -> String -> Element msg
+viewHand hand label =
+    column
+        [ alignLeft
+        , Font.color <| rgb 1 1 1
+        , width <| fill
+        , height <| fill
+        ]
+        [ el [ alignTop ] (text <| label ++ " Hand")
+        , cardsView hand
+        ]
+
+
+viewScore : List Card -> Element msg
+viewScore hand =
+    column
+        [ alignRight ]
+        [ row []
+            [ text "Current Score: "
+            , text <| String.fromInt <| calculateScore hand
             ]
-            [ el [ alignTop ] (text "Player Hand")
-            , cardsView model.playerCards
-            ]
-        , column
-            [ alignRight ]
-            [ row [] [ text "Player Game Status" ]
-            , row []
-                [ text "Current Score: "
-                , text <| String.fromInt <| calculateScore model.playerCards
-                ]
-            , row []
-                [ text <| calculateResultString model.playerCards
-                ]
+        , row []
+            [ text <| calculateResultString hand
             ]
         ]
 
